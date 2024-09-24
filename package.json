@@ -1,17 +1,7 @@
 {
-  "name": "pontos-interesse",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "Alexandre Ornellas Cardeira",
-  "license": "ISC",
   "dependencies": {
-    "@google-cloud/bigquery": "^7.7.0",
-    "body-parser": "^1.20.2",
-    "express": "^4.19.2"
-    
+    "@google-cloud/bigquery": "^7.3.0",
+    "cors": "^2.8.5",
+    "unirest": "0.6.0"
   }
 }

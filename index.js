@@ -1,30 +1,67 @@
 /*
-ORNELLAS          23/05/2024 07:41             Endpoint "Pontos de interesse" 
-                                               ( Lista horários de chegada dos veículos nos endereços de coleta/entrega, etc...)
+ORNELLAS            21/05/2024 15:52              Retorna horários e coordenadas GPS em que um veículo chegou em determinadas localidades ( pontos de interesse )...
 */
-const express = require("express");
-const bodyParser = require("body-parser");
-const { BigQuery } = require("@google-cloud/bigquery");
+const { BigQuery } = require('@google-cloud/bigquery');
 
-const app = express();
-const port = 3000;
+const cors = require('cors')({ origin: true });
+
+const unirest = require('unirest'); // creates express http server
+
 
 // Create a BigQuery client
 const bigQueryClient = new BigQuery();
 
-// Configure body-parser to handle JSON requests
-app.use(bodyParser.json());
+/**
+ * A Cloud Function that processes vehicle data based on request JSON.
+ *
+ * @param {Object} req The HTTP request object.
+ * @param {Object} res The HTTP response object.
+ */
+exports.processVehicleData = async (req, res) => {
 
-// Define a simple route to test the API
-app.get("/", (req, res) => {
-  res.send("Bem vindo à API de Pontos de Interesse!");
-});
+ // Use the cors middleware to handle CORS headers
+  cors(req, res, async () => {
 
-// Route to handle a POST request with data in the body
-app.post("/api", async (req, res) => {
-  //console.log('Received data:', req.body);
+   // Get the Authorization header from the request
+  const authorizationHeader = req.headers['authorization'];
 
-  const data = req.body; // Access the entire JSON object
+  // Check if the Authorization header is present
+  if (!authorizationHeader) {
+    return res.status(401).send('Unauthorized: No Authorization header');
+  }
+
+  // Assuming the Authorization header follows the format "Bearer <token>"
+  const [bearer, token] = authorizationHeader.split(' ');
+
+  // Check if the Authorization header starts with "Bearer"
+  if (bearer !== 'Bearer' || !token) {
+    return res.status(401).send('Unauthorized: Invalid Authorization header format');
+  }
+
+  // Now, 'token' contains the actual token that you can use in your function
+  //console.log('Token:', token);
+  
+
+  //Verifica sessão ao invés de token fixo...
+  const infoLogin = await unirest.post('https://www.aerosoftcargas.com.br/aeroctrl/gerais/infogeral.aspx')
+    .headers({'Accept': 'text/plain', 'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'})
+    .send({ 'id': '3', 'session': token});
+      
+  //console.log(response.body);
+  const info = infoLogin.body.split('|');
+
+  if(!info[0] || info[0]!=='OK'){
+    
+     return res.status(401).send('Unauthorized: Invalid Authorization token');
+   
+   }
+  
+
+
+  try {
+   
+   
+    const data = req.body; // Access the entire JSON object
 
   const placa = data.placa;
   const startDate = data.startDate;
@@ -36,13 +73,11 @@ app.post("/api", async (req, res) => {
   //console.log(pontosInteresse);
 
   const eventos = [];
-  
-  const procName= process.env.PROC_NAME;
 
   for (pontoInteresse of pontosInteresse) {
     //console.log(pontoInteresse);
 
-    const aquery = `call ${procName}(
+    const aquery = `call aeromobilejs.rastreamento_veiculos_ds.getChegada(
         "${placa}",
         "${startDate}",
         "${endDate}",
@@ -90,9 +125,24 @@ app.post("/api", async (req, res) => {
   }
  
 
-  res.json(eventos);
-});
 
-app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
-});
+
+    
+    // Set the Content-Type header to indicate JSON response
+    res.set('Content-Type', 'application/json');
+    
+     // Set CORS headers in the response
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+   
+  res.json(eventos);
+  
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error processing vehicle data");
+  }
+
+  });
+};
